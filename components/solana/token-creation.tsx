@@ -42,7 +42,10 @@ export default function TokenCreation() {
       return;
     }
 
-    const tokenResult = await createToken(formData);
+    const tokenResult = await createToken({
+      ...formData,
+      uri: "https://raw.githubusercontent.com/mohametalmeari/metadata/refs/heads/main/metadata.json",
+    });
     if (tokenResult) {
       setResult(tokenResult);
       setFormData({
