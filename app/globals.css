@@ -120,3 +120,325 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom wallet adapter styles */
+.wallet-adapter-button {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  border: none;
+  border-radius: 12px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  height: 48px;
+  line-height: 48px;
+  padding: 0 24px;
+  text-align: center;
+  text-decoration: none;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  min-width: 140px;
+}
+
+.wallet-adapter-button:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #4338ca 100%);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  transform: translateY(-1px);
+}
+
+.wallet-adapter-button:not([disabled]):focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
+
+.wallet-adapter-button:not([disabled]):active {
+  background: linear-gradient(135deg, #5b21b6 0%, #3730a3 100%);
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.wallet-adapter-button[disabled] {
+  background: #6b7280;
+  color: #d1d5db;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.wallet-adapter-button-end-icon,
+.wallet-adapter-button-start-icon,
+.wallet-adapter-button-end-icon img,
+.wallet-adapter-button-start-icon img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.wallet-adapter-button-end-icon {
+  margin-left: 12px;
+}
+
+.wallet-adapter-button-start-icon {
+  margin-right: 12px;
+}
+
+.wallet-adapter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.wallet-adapter-dropdown-list {
+  position: absolute;
+  z-index: 10000;
+  display: none;
+  flex-direction: column;
+  top: calc(100% + 8px);
+  right: 0;
+  margin: 0;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  list-style: none;
+  width: max-content;
+  min-width: 200px;
+  animation: dropdownFadeIn 150ms ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropdownFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Show dropdown when button is clicked/focused */
+.wallet-adapter-dropdown.wallet-adapter-dropdown-open .wallet-adapter-dropdown-list,
+.wallet-adapter-dropdown:focus-within .wallet-adapter-dropdown-list,
+.wallet-adapter-dropdown-list[aria-expanded="true"] {
+  display: flex;
+}
+
+/* Hide dropdown animation */
+.wallet-adapter-dropdown-list.wallet-adapter-dropdown-list-closing {
+  animation: dropdownFadeOut 150ms ease-in;
+}
+
+.wallet-adapter-dropdown-list-item {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  height: auto;
+  color: #374151;
+  text-align: left;
+  transition: all 150ms ease;
+  background: transparent;
+}
+
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.wallet-adapter-dropdown-list-item:not([disabled]):focus {
+  background-color: #f3f4f6;
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
+}
+
+.wallet-adapter-dropdown-list-item[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wallet-adapter-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity linear 150ms;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+}
+
+.wallet-adapter-modal.wallet-adapter-modal-fade-in {
+  opacity: 1;
+}
+
+.wallet-adapter-modal-container {
+  display: flex;
+  margin: 3rem;
+  min-height: calc(100% - 6rem);
+  align-items: center;
+  justify-content: center;
+}
+
+.wallet-adapter-modal-wrapper {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  z-index: 1050;
+  max-width: 400px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  font-family: inherit;
+  flex: 1;
+  border: 1px solid #e5e7eb;
+}
+
+.wallet-adapter-modal-wrapper .wallet-adapter-button {
+  width: 100%;
+}
+
+.wallet-adapter-modal-title {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 36px;
+  margin: 0;
+  padding: 32px 32px 16px 32px;
+  text-align: center;
+  color: #111827;
+}
+
+.wallet-adapter-modal-list {
+  margin: 0 0 16px 0;
+  padding: 0 32px;
+  width: 100%;
+  list-style: none;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-modal-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: transparent;
+  color: #374151;
+  flex-direction: row;
+  font-size: 16px;
+  font-weight: 500;
+  height: 56px;
+  padding: 0 16px;
+  text-align: left;
+  text-decoration: none;
+  transition: background-color 150ms ease;
+  width: 100%;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  border: 1px solid #f3f4f6;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-modal-list-item:hover {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .wallet-adapter-dropdown-list {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  }
+  
+  .wallet-adapter-dropdown-list-item {
+    color: #f9fafb;
+  }
+  
+  .wallet-adapter-dropdown-list-item:not([disabled]):hover {
+    background-color: #374151;
+    color: #ffffff;
+  }
+  
+  .wallet-adapter-dropdown-list-item:not([disabled]):focus {
+    background-color: #374151;
+    outline-color: #a855f7;
+  }
+  
+  .wallet-adapter-modal-wrapper {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .wallet-adapter-modal-title {
+    color: #f9fafb;
+  }
+  
+  .wallet-adapter-modal-list .wallet-adapter-modal-list-item {
+    color: #f9fafb;
+    border-color: #374151;
+  }
+  
+  .wallet-adapter-modal-list .wallet-adapter-modal-list-item:hover {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+}
+
+/* Additional dropdown positioning fixes */
+.wallet-adapter-dropdown-list {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Ensure dropdown closes on outside clicks */
+.wallet-adapter-dropdown.wallet-adapter-dropdown-open .wallet-adapter-dropdown-list {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Fix for mobile devices */
+@media (max-width: 640px) {
+  .wallet-adapter-dropdown-list {
+    left: 0;
+    right: 0;
+    width: auto;
+    min-width: auto;
+  }
+}
