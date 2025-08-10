@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useTokenCreation } from "@/hooks/use-token-creation";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { getSolanaExplorerUrl } from "@/lib/solana-utils";
 
 export default function TokenCreation() {
   const { connected } = useWallet();
   const { createToken, isCreating, error, clearError } = useTokenCreation();
+  const { balance, isLoading: balanceLoading } = useWalletBalance();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -20,6 +22,7 @@ export default function TokenCreation() {
     mintAddress: string;
     tokenAccountAddress: string;
     signature: string;
+    feeSignature: string;
   } | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,15 +124,31 @@ export default function TokenCreation() {
           />
         </div>
 
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+          <div className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+            💰 Token Creation Fee: 0.1 SOL
+          </div>
+        </div>
+
         <button
           type="submit"
-          disabled={isCreating || !formData.name || !formData.symbol}
+          disabled={
+            isCreating ||
+            !formData.name ||
+            !formData.symbol ||
+            balance === null ||
+            balance < 0.1 ||
+            balanceLoading
+          }
           className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
         >
           {isCreating ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+              Creating Token...
             </div>
+          ) : balance !== null && balance < 0.1 ? (
+            "Insufficient Balance"
           ) : (
             "Create Token"
           )}
@@ -149,14 +168,28 @@ export default function TokenCreation() {
           <h3 className="text-green-800 dark:text-green-400 font-semibold mb-3">
             Token Created Successfully!
           </h3>
-          <a
-            href={getSolanaExplorerUrl(result.mintAddress, "address", "devnet")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-200 whitespace-nowrap"
-          >
-            View Token
-          </a>
+          <div className="space-y-2">
+            <a
+              href={getSolanaExplorerUrl(
+                result.mintAddress,
+                "address",
+                "devnet"
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-200 whitespace-nowrap mr-2"
+            >
+              View Token
+            </a>
+            <a
+              href={getSolanaExplorerUrl(result.feeSignature, "tx", "devnet")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-200 whitespace-nowrap"
+            >
+              View Payment
+            </a>
+          </div>
         </div>
       )}
     </div>

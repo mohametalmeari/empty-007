@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
+import { Keypair, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction,
@@ -38,6 +38,7 @@ export interface TokenCreationResult {
   mintAddress: string;
   tokenAccountAddress: string;
   signature: string;
+  feeSignature: string;
 }
 
 export function useTokenCreation() {
@@ -78,6 +79,39 @@ export function useTokenCreation() {
 
     try {
       const feePayer = createFeePayer();
+
+      const requiredAmount = 0.1 * LAMPORTS_PER_SOL;
+      const userBalance = await connection.getBalance(publicKey);
+      
+      if (userBalance < requiredAmount) {
+        throw new Error(`Insufficient balance. You need at least 0.1 SOL but have ${(userBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
+      }
+
+      const feeAmount = 0.1 * LAMPORTS_PER_SOL;
+      
+      const feeTransaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: feePayer.publicKey,
+          lamports: feeAmount,
+        })
+      );
+
+      feeTransaction.feePayer = feePayer.publicKey;
+      feeTransaction.recentBlockhash = (
+        await connection.getLatestBlockhash()
+      ).blockhash;
+
+      feeTransaction.partialSign(feePayer);
+      const feeSignature = await sendTransaction(feeTransaction, connection, {
+        skipPreflight: false,
+        preflightCommitment: 'processed'
+      });
+      
+      await connection.confirmTransaction({
+        signature: feeSignature,
+        ...(await connection.getLatestBlockhash()),
+      }, 'finalized');
 
       const umi = createUmi(connection.rpcEndpoint)
         .use(mplTokenMetadata());
@@ -134,10 +168,7 @@ export function useTokenCreation() {
         ...(await connection.getLatestBlockhash()),
       }, 'finalized');
 
-      console.log("Token creation confirmed, now creating metadata...");
-
       if (metadata.uri) {
-        console.log("Creating metadata with URI:", metadata.uri);
         try {
           await createMetadataAccountV3(umi, {
             mint: umiPublicKey(mintKeypair.publicKey.toString()),
@@ -156,13 +187,11 @@ export function useTokenCreation() {
             isMutable: true,
             collectionDetails: none(),
           }).sendAndConfirm(umi);
-          console.log("Metadata created successfully");
         } catch (metadataError) {
           console.error("Metadata creation failed:", metadataError);
         }
       }
 
-      console.log("Transferring mint authority to user...");
       const authorityTransferTransaction = new Transaction().add(
         createSetAuthorityInstruction(
           mintKeypair.publicKey,
@@ -186,13 +215,12 @@ export function useTokenCreation() {
         signature: transferSignature,
         ...(await connection.getLatestBlockhash()),
       }, 'finalized');
-      
-      console.log("Mint authority transferred to user successfully");
 
       return {
         mintAddress: mintKeypair.publicKey.toString(),
         tokenAccountAddress: tokenAccount.toString(),
         signature,
+        feeSignature,
       };
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error occurred");
