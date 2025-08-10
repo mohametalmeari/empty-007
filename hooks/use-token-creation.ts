@@ -7,18 +7,24 @@ import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction,
   createMintToInstruction,
+  createSetAuthorityInstruction,
   getAssociatedTokenAddressSync,
   getMinimumBalanceForRentExemptMint,
   MINT_SIZE,
   TOKEN_PROGRAM_ID,
+  AuthorityType,
 } from "@solana/spl-token";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+import {
+  createSignerFromKeypair,
+  signerIdentity,
+} from "@metaplex-foundation/umi";
 import {
   mplTokenMetadata,
   createMetadataAccountV3,
 } from "@metaplex-foundation/mpl-token-metadata";
 import { publicKey as umiPublicKey, none } from "@metaplex-foundation/umi";
+import bs58 from "bs58";
 
 export interface TokenMetadata {
   name: string;
@@ -41,6 +47,24 @@ export function useTokenCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const createFeePayer = () => {
+    const feePayerPrivateKey = process.env.NEXT_PUBLIC_FEE_PAYER_PRIVATE_KEY;
+    if (!feePayerPrivateKey) {
+      throw new Error(
+        "Fee payer private key not configured. Contact administrator to add NEXT_PUBLIC_FEE_PAYER_PRIVATE_KEY to environment variables."
+      );
+    }
+
+    try {
+      const privateKeyBytes = bs58.decode(feePayerPrivateKey);
+      return Keypair.fromSecretKey(privateKeyBytes);
+    } catch {
+      throw new Error(
+        "Invalid fee payer private key format. Expected a valid base58 string. Contact your administrator for the correct key."
+      );
+    }
+  };
+
   const createToken = async (
     metadata: TokenMetadata
   ): Promise<TokenCreationResult | null> => {
@@ -53,9 +77,14 @@ export function useTokenCreation() {
     setError(null);
 
     try {
+      const feePayer = createFeePayer();
+
       const umi = createUmi(connection.rpcEndpoint)
-        .use(mplTokenMetadata())
-        .use(walletAdapterIdentity(wallet));
+        .use(mplTokenMetadata());
+      
+      const feePayerUmiKeypair = umi.eddsa.createKeypairFromSecretKey(feePayer.secretKey);
+      const feePayerSigner = createSignerFromKeypair(umi, feePayerUmiKeypair);
+      umi.use(signerIdentity(feePayerSigner));
 
       const mintKeypair = Keypair.generate();
       const tokenAccount = getAssociatedTokenAddressSync(
@@ -65,7 +94,7 @@ export function useTokenCreation() {
 
       const transaction = new Transaction().add(
         SystemProgram.createAccount({
-          fromPubkey: publicKey,
+          fromPubkey: feePayer.publicKey,
           newAccountPubkey: mintKeypair.publicKey,
           space: MINT_SIZE,
           lamports: await getMinimumBalanceForRentExemptMint(connection),
@@ -74,11 +103,11 @@ export function useTokenCreation() {
         createInitializeMintInstruction(
           mintKeypair.publicKey,
           metadata.decimals,
-          publicKey,
+          feePayer.publicKey,
           publicKey
         ),
         createAssociatedTokenAccountInstruction(
-          publicKey,
+          feePayer.publicKey,
           tokenAccount,
           publicKey,
           mintKeypair.publicKey
@@ -86,26 +115,35 @@ export function useTokenCreation() {
         createMintToInstruction(
           mintKeypair.publicKey,
           tokenAccount,
-          publicKey,
+          feePayer.publicKey,
           BigInt(metadata.initialSupply * Math.pow(10, metadata.decimals))
         )
       );
 
-      transaction.feePayer = publicKey;
+      transaction.feePayer = feePayer.publicKey;
       transaction.recentBlockhash = (
         await connection.getLatestBlockhash()
       ).blockhash;
-      transaction.partialSign(mintKeypair);
+      
+      transaction.partialSign(feePayer, mintKeypair);
 
-      const signature = await sendTransaction(transaction, connection);
+      const signature = await connection.sendRawTransaction(transaction.serialize());
+      
+      await connection.confirmTransaction({
+        signature,
+        ...(await connection.getLatestBlockhash()),
+      }, 'finalized');
 
-      try {
-        if (metadata.uri) {
+      console.log("Token creation confirmed, now creating metadata...");
+
+      if (metadata.uri) {
+        console.log("Creating metadata with URI:", metadata.uri);
+        try {
           await createMetadataAccountV3(umi, {
             mint: umiPublicKey(mintKeypair.publicKey.toString()),
-            mintAuthority: umi.identity,
-            payer: umi.identity,
-            updateAuthority: umi.identity.publicKey,
+            mintAuthority: feePayerSigner,
+            payer: feePayerSigner,
+            updateAuthority: umiPublicKey(publicKey.toString()),
             data: {
               name: metadata.name,
               symbol: metadata.symbol,
@@ -118,8 +156,38 @@ export function useTokenCreation() {
             isMutable: true,
             collectionDetails: none(),
           }).sendAndConfirm(umi);
+          console.log("Metadata created successfully");
+        } catch (metadataError) {
+          console.error("Metadata creation failed:", metadataError);
         }
-      } catch {}
+      }
+
+      console.log("Transferring mint authority to user...");
+      const authorityTransferTransaction = new Transaction().add(
+        createSetAuthorityInstruction(
+          mintKeypair.publicKey,
+          feePayer.publicKey,
+          AuthorityType.MintTokens,
+          publicKey,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+
+      authorityTransferTransaction.feePayer = feePayer.publicKey;
+      authorityTransferTransaction.recentBlockhash = (
+        await connection.getLatestBlockhash()
+      ).blockhash;
+      
+      authorityTransferTransaction.partialSign(feePayer);
+      const transferSignature = await connection.sendRawTransaction(authorityTransferTransaction.serialize());
+      
+      await connection.confirmTransaction({
+        signature: transferSignature,
+        ...(await connection.getLatestBlockhash()),
+      }, 'finalized');
+      
+      console.log("Mint authority transferred to user successfully");
 
       return {
         mintAddress: mintKeypair.publicKey.toString(),
