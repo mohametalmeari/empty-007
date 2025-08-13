@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  Keypair,
+  SystemProgram,
+  Transaction,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
 import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction,
@@ -82,17 +88,29 @@ export function useTokenCreation() {
 
       const requiredAmount = 0.1 * LAMPORTS_PER_SOL;
       const userBalance = await connection.getBalance(publicKey);
-      
+
       if (userBalance < requiredAmount) {
-        throw new Error(`Insufficient balance. You need at least 0.1 SOL but have ${(userBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
+        throw new Error(
+          `Insufficient balance. You need at least 0.1 SOL but have ${(
+            userBalance / LAMPORTS_PER_SOL
+          ).toFixed(4)} SOL`
+        );
       }
 
       const feeAmount = 0.1 * LAMPORTS_PER_SOL;
-      
+
+      const feeReceiverPublicKey =
+        process.env.NEXT_PUBLIC_FEE_RECEIVER_PUBLIC_KEY;
+      if (!feeReceiverPublicKey) {
+        throw new Error(
+          "Fee receiver public key not configured. Contact administrator to add NEXT_PUBLIC_FEE_RECEIVER_PUBLIC_KEY to environment variables."
+        );
+      }
+
       const feeTransaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: feePayer.publicKey,
+          toPubkey: new PublicKey(feeReceiverPublicKey),
           lamports: feeAmount,
         })
       );
@@ -105,18 +123,22 @@ export function useTokenCreation() {
       feeTransaction.partialSign(feePayer);
       const feeSignature = await sendTransaction(feeTransaction, connection, {
         skipPreflight: false,
-        preflightCommitment: 'processed'
+        preflightCommitment: "processed",
       });
-      
-      await connection.confirmTransaction({
-        signature: feeSignature,
-        ...(await connection.getLatestBlockhash()),
-      }, 'finalized');
 
-      const umi = createUmi(connection.rpcEndpoint)
-        .use(mplTokenMetadata());
-      
-      const feePayerUmiKeypair = umi.eddsa.createKeypairFromSecretKey(feePayer.secretKey);
+      await connection.confirmTransaction(
+        {
+          signature: feeSignature,
+          ...(await connection.getLatestBlockhash()),
+        },
+        "finalized"
+      );
+
+      const umi = createUmi(connection.rpcEndpoint).use(mplTokenMetadata());
+
+      const feePayerUmiKeypair = umi.eddsa.createKeypairFromSecretKey(
+        feePayer.secretKey
+      );
       const feePayerSigner = createSignerFromKeypair(umi, feePayerUmiKeypair);
       umi.use(signerIdentity(feePayerSigner));
 
@@ -158,15 +180,20 @@ export function useTokenCreation() {
       transaction.recentBlockhash = (
         await connection.getLatestBlockhash()
       ).blockhash;
-      
+
       transaction.partialSign(feePayer, mintKeypair);
 
-      const signature = await connection.sendRawTransaction(transaction.serialize());
-      
-      await connection.confirmTransaction({
-        signature,
-        ...(await connection.getLatestBlockhash()),
-      }, 'finalized');
+      const signature = await connection.sendRawTransaction(
+        transaction.serialize()
+      );
+
+      await connection.confirmTransaction(
+        {
+          signature,
+          ...(await connection.getLatestBlockhash()),
+        },
+        "finalized"
+      );
 
       if (metadata.uri) {
         try {
@@ -207,14 +234,19 @@ export function useTokenCreation() {
       authorityTransferTransaction.recentBlockhash = (
         await connection.getLatestBlockhash()
       ).blockhash;
-      
+
       authorityTransferTransaction.partialSign(feePayer);
-      const transferSignature = await connection.sendRawTransaction(authorityTransferTransaction.serialize());
-      
-      await connection.confirmTransaction({
-        signature: transferSignature,
-        ...(await connection.getLatestBlockhash()),
-      }, 'finalized');
+      const transferSignature = await connection.sendRawTransaction(
+        authorityTransferTransaction.serialize()
+      );
+
+      await connection.confirmTransaction(
+        {
+          signature: transferSignature,
+          ...(await connection.getLatestBlockhash()),
+        },
+        "finalized"
+      );
 
       return {
         mintAddress: mintKeypair.publicKey.toString(),
